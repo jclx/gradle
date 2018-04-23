@@ -60,9 +60,6 @@ public class CompositeBuildSettingsLoader implements SettingsLoader {
             buildRegistry.addExplicitBuild(BuildDefinition.fromStartParameterForBuild(gradle.getStartParameter(), rootDir, DefaultPluginRequests.EMPTY), nestedBuildFactory);
         }
 
-        // Lock-in explicitly included builds
-        buildRegistry.registerRootBuild(settings);
-
         return settings;
     }
 }

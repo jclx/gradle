@@ -17,10 +17,12 @@
 package org.gradle.composite.internal;
 
 import org.gradle.api.Action;
+import org.gradle.api.Transformer;
 import org.gradle.api.artifacts.component.BuildIdentifier;
 import org.gradle.api.internal.BuildDefinition;
 import org.gradle.api.internal.SettingsInternal;
 import org.gradle.api.internal.artifacts.DefaultBuildIdentifier;
+import org.gradle.api.invocation.Gradle;
 import org.gradle.initialization.BuildRequestContext;
 import org.gradle.initialization.GradleLauncher;
 import org.gradle.initialization.GradleLauncherFactory;
@@ -38,36 +40,40 @@ class DefaultRootBuildState implements RootBuildState {
     private final GradleLauncherFactory gradleLauncherFactory;
     private final ListenerManager listenerManager;
     private final ServiceRegistry services;
+    private final BuildStateListener buildStateListener;
     private SettingsInternal settings;
 
-    DefaultRootBuildState(BuildDefinition buildDefinition, BuildRequestContext requestContext, GradleLauncherFactory gradleLauncherFactory, ListenerManager listenerManager, ServiceRegistry services) {
+    DefaultRootBuildState(BuildDefinition buildDefinition, BuildRequestContext requestContext, GradleLauncherFactory gradleLauncherFactory, ListenerManager listenerManager, ServiceRegistry services, BuildStateListener buildStateListener) {
         this.buildDefinition = buildDefinition;
         this.requestContext = requestContext;
         this.gradleLauncherFactory = gradleLauncherFactory;
         this.listenerManager = listenerManager;
         this.services = services;
+        this.buildStateListener = buildStateListener;
     }
 
     @Override
-    public Object run(Action<? super BuildController> buildAction) {
+    public <T> T run(Transformer<T, ? super BuildController> buildAction) {
         GradleLauncher gradleLauncher = gradleLauncherFactory.newInstance(buildDefinition, requestContext, services);
-        GradleBuildController buildController = new GradleBuildController(gradleLauncher);
+        final GradleBuildController buildController = new GradleBuildController(gradleLauncher);
         try {
             RootBuildLifecycleListener buildLifecycleListener = listenerManager.getBroadcaster(RootBuildLifecycleListener.class);
             buildLifecycleListener.afterStart();
             try {
-                buildAction.execute(buildController);
-                return buildController.getResult();
+                buildController.getGradle().projectsLoaded(new Action<Gradle>() {
+                    @Override
+                    public void execute(Gradle gradle) {
+                        settings = buildController.getGradle().getSettings();
+                        buildStateListener.projectsKnown(DefaultRootBuildState.this);
+                    }
+                });
+                return buildAction.transform(buildController);
             } finally {
                 buildLifecycleListener.beforeComplete();
             }
         } finally {
             buildController.stop();
         }
-    }
-
-    public void setSettings(SettingsInternal settings) {
-        this.settings = settings;
     }
 
     @Override

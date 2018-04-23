@@ -18,7 +18,6 @@ package org.gradle.internal.build;
 
 import org.gradle.api.artifacts.component.BuildIdentifier;
 import org.gradle.api.internal.BuildDefinition;
-import org.gradle.api.internal.SettingsInternal;
 import org.gradle.initialization.BuildRequestContext;
 import org.gradle.initialization.NestedBuildFactory;
 
@@ -30,7 +29,7 @@ import java.util.Collection;
  */
 public interface BuildStateRegistry {
     /**
-     * Creates the root of the build tree.
+     * Creates the root build of the build tree.
      */
     RootBuildState addRootBuild(BuildDefinition buildDefinition, BuildRequestContext requestContext);
 
@@ -46,13 +45,6 @@ public interface BuildStateRegistry {
     IncludedBuildState getIncludedBuild(BuildIdentifier buildIdentifier);
 
     /**
-     * Notification that the settings have been loaded for the root build.
-     *
-     * This shouldn't be on this interface, as this is state for the root build that should be managed internally by the {@link RootBuildState} instance instead. This method is here to allow transition towards that structure.
-     */
-    void registerRootBuild(SettingsInternal settings);
-
-    /**
      * Registers an included build. An included build is-a child build whose projects and outputs are treated as part of the composite build.
      */
     IncludedBuildState addExplicitBuild(BuildDefinition buildDefinition, NestedBuildFactory nestedBuildFactory);
@@ -60,7 +52,7 @@ public interface BuildStateRegistry {
     /**
      * Registers a child build that is not an included or implicit build.
      */
-    NestedBuildState addNestedBuild(SettingsInternal settings);
+    NestedBuildState addNestedBuild(BuildDefinition buildDefinition, NestedBuildFactory nestedBuildFactory);
 
     /**
      * Registers an implicit build. An implicit build is-a child build whose outputs are used by dependency resolution.

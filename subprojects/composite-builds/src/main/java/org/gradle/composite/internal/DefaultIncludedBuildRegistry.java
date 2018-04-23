@@ -28,6 +28,7 @@ import org.gradle.api.specs.Spec;
 import org.gradle.initialization.BuildRequestContext;
 import org.gradle.initialization.GradleLauncherFactory;
 import org.gradle.initialization.NestedBuildFactory;
+import org.gradle.internal.build.BuildState;
 import org.gradle.internal.build.BuildStateRegistry;
 import org.gradle.internal.build.IncludedBuildState;
 import org.gradle.internal.build.NestedBuildState;
@@ -72,7 +73,12 @@ public class DefaultIncludedBuildRegistry implements BuildStateRegistry, Stoppab
         if (rootBuild != null) {
             throw new IllegalStateException("Root build already defined.");
         }
-        rootBuild = new DefaultRootBuildState(buildDefinition, requestContext, gradleLauncherFactory, listenerManager, rootServices);
+        rootBuild = new DefaultRootBuildState(buildDefinition, requestContext, gradleLauncherFactory, listenerManager, rootServices, new BuildStateListener(){
+            @Override
+            public void projectsKnown(BuildState build) {
+                registerRootBuild(build.getLoadedSettings());
+            }
+        });
         return rootBuild;
     }
 
@@ -100,11 +106,10 @@ public class DefaultIncludedBuildRegistry implements BuildStateRegistry, Stoppab
         });
     }
 
-    @Override
-    public void registerRootBuild(SettingsInternal settings) {
+    private void registerRootBuild(SettingsInternal settings) {
         validateIncludedBuilds(settings);
 
-        registerRootBuildProjects(settings);
+        projectRegistry.registerProjects(rootBuild);
         Collection<IncludedBuildState> includedBuilds = getIncludedBuilds();
         List<IncludedBuild> modelElements = new ArrayList<IncludedBuild>(includedBuilds.size());
         for (IncludedBuildState includedBuild : includedBuilds) {
@@ -157,10 +162,13 @@ public class DefaultIncludedBuildRegistry implements BuildStateRegistry, Stoppab
     }
 
     @Override
-    public NestedBuildState addNestedBuild(SettingsInternal settings) {
-        DefaultNestedBuild build = new DefaultNestedBuild(settings);
-        projectRegistry.registerProjects(build);
-        return build;
+    public NestedBuildState addNestedBuild(BuildDefinition buildDefinition, NestedBuildFactory nestedBuildFactory) {
+        return new DefaultNestedBuild(buildDefinition, nestedBuildFactory, new BuildStateListener() {
+            @Override
+            public void projectsKnown(BuildState build1) {
+                projectRegistry.registerProjects(build1);
+            }
+        });
     }
 
     private IncludedBuildState registerBuild(BuildDefinition buildDefinition, boolean isImplicit, NestedBuildFactory nestedBuildFactory) {
@@ -172,11 +180,6 @@ public class DefaultIncludedBuildRegistry implements BuildStateRegistry, Stoppab
         }
         // TODO: else, verify that the build definition is the same
         return includedBuild;
-    }
-
-    private void registerRootBuildProjects(final SettingsInternal settings) {
-        rootBuild.setSettings(settings);
-        projectRegistry.registerProjects(rootBuild);
     }
 
     @Override
